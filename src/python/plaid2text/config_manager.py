@@ -7,8 +7,14 @@ import sys
 import re
 
 from plaid2text.interact import prompt, NullValidator, YesNoValidator
-from plaid import Client
-from plaid import errors as plaid_errors
+import plaid
+from plaid.api import plaid_api
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
+from plaid.model.country_code import CountryCode
+from plaid.model.products import Products
+from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
+from plaid.model.accounts_get_request import AccountsGetRequest
 
 import json
 
@@ -149,6 +155,11 @@ def get_config(account):
                 defaults['addons']['addon_' + item[0]] = int(item[1])
     return defaults
 
+def get_defaults():
+    config = _get_config_parser()
+    defaults = OrderedDict(config.items('DEFAULT'))
+    defaults['config_file'] = FILE_DEFAULTS.config_file
+    return defaults
 
 def get_configured_accounts():
     config = _get_config_parser()
@@ -224,57 +235,87 @@ def create_account(account):
         _create_directory_tree(FILE_DEFAULTS.config_file)
         config = configparser.ConfigParser(interpolation=None)
         config[account] = OrderedDict()
-        plaid = config[account]
+        plaid_acc = config[account]
         client_id, secret = get_plaid_config()
         # client_id = prompt('Enter your Plaid client_id: ', validator=NullValidator())
         # plaid['client_id'] = client_id
         # secret = prompt('Enter your Plaid secret: ', validator=NullValidator())
         # plaid['secret'] = secret
-        
-        configs = {
-            'user': {
-                'client_user_id': '123-test-user-id',
-            },
-            'products': ['transactions'],
-            'client_name': "Plaid Test App",
-            'country_codes': ['US'],
-            'language': 'en',
-        }
 
         # create link token
-        client = Client(client_id, secret, "development", suppress_warnings=True)
-        response = client.LinkToken.create(configs)
-        link_token = response['link_token']
+        configuration = plaid.Configuration(
+            host=plaid.Environment.Development,
+            api_key={
+                'clientId': client_id,
+                'secret': secret,
+            }
+        )
+
+        api_client = plaid.ApiClient(configuration)
+        client = plaid_api.PlaidApi(api_client)
+        linkRequest = LinkTokenCreateRequest(
+            user = LinkTokenCreateRequestUser(
+                        client_user_id = '123-test-user-id',
+                    ),
+            client_name = 'Plaid2text',
+            client_id = client_id,
+            secret = secret,
+            products = [Products('transactions')],
+            country_codes = [CountryCode('US')],
+            language = 'en',
+        )
+
+        linkResponse = client.link_token_create(linkRequest)
+        link_token = linkResponse['link_token']
 
         generate_auth_page(link_token)
         print("\n\nPlease open " + FILE_DEFAULTS.auth_file + " to authenticate your account with Plaid")
+        print('Run \'python3 -m http.server\' from ', DEFAULT_CONFIG_DIR, ' and then visit \'localhost:8000\' in your browser to complete authentication.\nCopy the public token at the end of the auth flow and enter it below.')
         public_token = prompt('Enter your public_token from the auth page: ', validator=NullValidator())
-        # plaid['public_token'] = public_token
 
-        response = client.Item.public_token.exchange(public_token)
-        access_token = response['access_token']
-        plaid['access_token'] = access_token
-        item_id = response['item_id']
-        plaid['item_id'] = item_id
+        exchange_request = ItemPublicTokenExchangeRequest(
+            public_token=public_token
+        )
+        exchange_response = client.item_public_token_exchange(exchange_request)
+        access_token = exchange_response['access_token']
+        item_id = exchange_response['item_id']
 
-        response = client.Accounts.get(access_token)
+        plaid_acc['access_token'] = access_token
+        plaid_acc['item_id'] = item_id
 
-        accounts = response['accounts']
+        accountsRequest = AccountsGetRequest(
+            access_token = access_token,
+            client_id = client_id,
+            secret = secret
+        )
+
+        accountsResponse = client.accounts_get(accountsRequest)
+
+        accounts = accountsResponse['accounts']
 
         print("\n\nAccounts:\n")
         for item in accounts:
             print(item['name'] + ":")
             print(item['account_id'])
         account_id = prompt('\nEnter account_id of desired account: ', validator=NullValidator())
-        plaid['account'] = account_id
+        plaid_acc['account'] = account_id
 
-    except plaid_errors.ItemError as ex:
-        print("    %s" % ex, file=sys.stderr )
+    except plaid.ApiException as ex:
+        response = json.loads(ex.body)
+        print("    %s" % response['error_message'], file=sys.stderr )
         sys.exit(1)
     else:
         with open(FILE_DEFAULTS.config_file, mode='a') as f:
             config.write(f)
     return True
+
+def update_cursor(account, cursor):
+    config = configparser.ConfigParser()
+    config.read(FILE_DEFAULTS.config_file)
+    section = config[account]
+    section['cursor'] = cursor
+    with open (FILE_DEFAULTS.config_file, 'w') as f:
+        config.write(f)
 
 def generate_auth_page(link_token):
     page = """<html>
@@ -324,18 +365,32 @@ def update_link_token(access_token):
 
     # Obtain new link token
     client_id, secret = get_plaid_config()
-    configs = {
-    'user': {
-        'client_user_id': '123-test-user-id',
-    },
-    'client_name': "Plaid Test App",
-    'country_codes': ['US'],
-    'language': 'en',
-    'access_token': access_token
-    }
-    client = Client(client_id, secret, "development", suppress_warnings=True)
-    response = client.LinkToken.create(configs)
-    link_token = response['link_token']
+    configuration = plaid.Configuration(
+        host=plaid.Environment.Development,
+        api_key={
+            'clientId': client_id,
+            'secret': secret,
+        }
+    )
+
+    api_client = plaid.ApiClient(configuration)
+    client = plaid_api.PlaidApi(api_client)
+    config = _get_config_parser()
+
+    linkRequest = LinkTokenCreateRequest(
+        user = LinkTokenCreateRequestUser(
+                    client_user_id = '123-test-user-id',
+                ),
+        client_name = 'Plaid2Text',
+        client_id = client_id,
+        secret = secret,
+        access_token = access_token,
+        country_codes = [CountryCode('US')],
+        language = 'en',
+    )
+
+    linkResponse = client.link_token_create(linkRequest)
+    link_token = linkResponse['link_token'] 
 
     # Update auth.html file with new link token
 
@@ -348,8 +403,19 @@ def update_link_token(access_token):
     with open (FILE_DEFAULTS['auth_file'], "w") as f:
         f.write(data)
 
-    print('Link token updated.\nRun \'python3 -m http.server\' from ',DEFAULT_CONFIG_DIR,' and then visit \'localhost:8000\' in your browser to complete authentication with Plaid. Then, start downloading transactions again.')
+    account_name = get_account_in_item(access_token)
+
+    print('Link token updated for bank login containing ' + account_name +'.\nRun \'python3 -m http.server\' from ',DEFAULT_CONFIG_DIR,' and then visit \'localhost:8000\' in your browser to complete authentication with Plaid. Then, start downloading transactions again.')
     sys.exit(0)
+
+def get_account_in_item(access_token):
+    config = _get_config_parser()
+    for section in config.sections():
+        for (key,val) in config.items(section):
+            if key == 'access_token' and val == access_token:
+                account_name = section
+    return account_name
+
 
 if __name__ == '__main__':
     get_locale_currency_symbol()

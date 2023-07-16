@@ -56,11 +56,13 @@ class MongoDBStorage(StorageManager):
     def save_transactions(self, transactions):
         for t in transactions:
             if not t['pending']:
+                t = t.to_dict()
                 id = t['transaction_id']
-                # t.update(TEXT_DOC)
-                # Convert datetime
-                y, m, d = [int(i) for i in t['date'].split('-')]
-                t['date'] = datetime.datetime(y, m, d)
+                t['date'] = datetime.datetime.combine(t['date'],datetime.time())                            #pymongo accepts only datetime, not date
+                try:
+                    t['authorized_date'] = datetime.datetime.combine(t['authorized_date'],datetime.time())  #pymongo accepts only datetime, not date
+                except:                                                                                     # allowing for 'authorized_date' to be 'None' as in the case of ATM withdrawals
+                    pass
                 doc = {'$set': t}
                 # Add default plaid2text to new inserts
                 doc['$setOnInsert'] = TEXT_DOC
@@ -70,7 +72,10 @@ class MongoDBStorage(StorageManager):
         query = {}
         if only_new:
             query['plaid2text.pulled_to_file'] = {"$ne": True}
-
+        if from_date:   
+            from_date = datetime.datetime.combine(from_date, datetime.time())
+        if to_date:
+            to_date = datetime.datetime.combine(to_date, datetime.time())
         if from_date and to_date and (from_date <= to_date):
             query['date'] = {'$gte': from_date, '$lte': to_date}
         elif from_date and not to_date:
@@ -102,6 +107,8 @@ class MongoDBStorage(StorageManager):
         unpulled = list(self.account.find(query))
         pending = len(unpulled) > 0
         return pending
+
+# SQLite is completely untested
 
 class SQLiteStorage():
     def __init__(self, dbpath, account, posting_account):
@@ -206,3 +213,6 @@ class SQLiteStorage():
             where transaction_id = ?
         """, [json.dumps(update), trans_id] )
         self.conn.commit()
+
+    def check_pending():
+        print("This function has not been implemented for SQLite databases")
