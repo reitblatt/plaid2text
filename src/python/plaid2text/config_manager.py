@@ -74,7 +74,7 @@ DEFAULT_LEDGER_TEMPLATE = """\
     ; plaid_name: {name}
     ; _id: {transaction_id}
     {associated_account:<60}   {currency} {amount}
-    {posting_account:<60}
+    {posting_account:<60}   {currency} {negamount}
 """
 
 DEFAULT_BEANCOUNT_TEMPLATE = """\
@@ -82,7 +82,7 @@ DEFAULT_BEANCOUNT_TEMPLATE = """\
     plaid_name: "{name}"
     plaid_id: "{transaction_id}"
     {associated_account:<60}   {amount} {currency}
-    {posting_account}
+    {posting_account:<60}   {negAmount} {currency}
 """
 
 

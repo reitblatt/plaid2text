@@ -91,7 +91,8 @@ class Entry:
         format_data = {
             'associated_account': account,
             'payee': payee,
-            'tags': ret_tags
+            'tags': ret_tags,
+            'negAmount': self.transaction['amount'] *-1
         }
         format_data.update(self.transaction['addons'])
         format_data.update(self.transaction)
