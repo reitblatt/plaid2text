@@ -503,7 +503,7 @@ def main():
     else:
         out = LedgerRenderer(trxs, options)
 
-    callback = lambda dict: sm.update_transaction(dict, mark_pulled=not options.no_mark_pulled)
+    callback = lambda txns: sm.update_transaction(txns, mark_pulled=not options.no_mark_pulled)
 
     try:
         update_dict = out.process_transactions(callback=callback)

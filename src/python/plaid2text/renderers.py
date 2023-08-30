@@ -200,10 +200,11 @@ class OutputRenderer(metaclass=ABCMeta):
             dic['date_last_pulled'] = t['plaid2text']['date_last_pulled']
             out.append(dic)
 
-            # save the transactions into the database as they are processed
-            if callback: callback(dic)
-
             self.journal_lines.append(entry.journal_entry(payee, account, tags))
+        # update database all at once. Previously transactions were updated one by one but 
+        # if the process was interrupted, txns prior to the interrupt would be marked as pulled 
+        # without ever having their output sent to the outfile.
+        if callback: callback(out)
         return out
 
     def prompt_for_value(self, text_prompt, values, default):

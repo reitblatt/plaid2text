@@ -87,15 +87,16 @@ class MongoDBStorage(StorageManager):
         return list(transactions)
 
     def update_transaction(self, update, mark_pulled=None):
-        id = update.pop('transaction_id')
-        update['pulled_to_file'] = mark_pulled
-        if mark_pulled:
-            update['date_last_pulled'] = datetime.datetime.now()
+        for txn in update:
+            id = txn.pop('transaction_id')
+            txn['pulled_to_file'] = mark_pulled
+            if mark_pulled:
+                txn['date_last_pulled'] = datetime.datetime.now()
 
-        self.account.update_one(
-            {'_id': id},
-            {'$set': {"plaid2text": update}}
-        )
+            self.account.update_one(
+                {'_id': id},
+                {'$set': {"plaid2text": txn}}
+            )
 
     def get_latest_transaction_date(self):
         latest = list(self.account.find().sort("date", DESCENDING).limit(1))[0]['date']
