@@ -201,19 +201,20 @@ class SQLiteStorage():
         return ret
 
     def update_transaction(self, update, mark_pulled=None):
-        trans_id = update.pop('transaction_id')
-        update['pulled_to_file'] = mark_pulled
-        if mark_pulled:            
-            update['date_last_pulled'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        for txn in update:
+            trans_id = txn.pop('transaction_id')
+            txn['pulled_to_file'] = mark_pulled
+            if mark_pulled:            
+                txn['date_last_pulled'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        update['archived'] = null
+            txn['archived'] = null
 
-        c = self.conn.cursor()
-        c.execute("""
-            update transactions set metadata = json_patch(coalesce(metadata, '{}'), ?) 
-            where transaction_id = ?
-        """, [json.dumps(update), trans_id] )
-        self.conn.commit()
+            c = self.conn.cursor()
+            c.execute("""
+                update transactions set metadata = json_patch(coalesce(metadata, '{}'), ?) 
+                where transaction_id = ?
+            """, [json.dumps(txn), trans_id] )
+            self.conn.commit()
 
     def check_pending():
         print("This function has not been implemented for SQLite databases")
