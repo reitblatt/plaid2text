@@ -54,7 +54,7 @@ CONFIG_DEFAULTS = dotdict({
     'output_date_format': '%Y/%m/%d',
     'quiet': False,
     'tags': False,
-    'dbtype': 'mongodb',
+    'dbtype': 'sqlite',
     'mongo_db': 'plaid2text',
     'mongo_db_uri': 'mongodb://localhost:27017',
     'sqlite_db': os.path.join(DEFAULT_CONFIG_DIR, 'transactions.db')
