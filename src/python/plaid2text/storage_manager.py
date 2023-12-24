@@ -140,9 +140,15 @@ class SQLiteStorage():
         Occurs when using the --download-transactions option.
         """
         for t in transactions:
+            t = t.to_dict()
             trans_id = t['transaction_id']
-            act_id   = t['account_id'] 
-
+            act_id   = t['account_id']
+            # Can't json serialize date object
+            t['date'] = t['date'].isoformat()
+            t['authorized_date'] = t['authorized_date'].isoformat()
+            t['authorized_datetime'] = t['authorized_datetime'].isoformat()
+            if t['datetime'] is not None:
+                t['datetime'] = t['datetime'].isoformat()
             metadata = t.get('plaid2text', None)
             if metadata is not None:
                 metadata = json.dumps(metadata)
@@ -194,7 +200,11 @@ class SQLiteStorage():
                 # set empty objects ({}) to None to account for assumptions that None means not processed
                 t['plaid2text'] = None
 
-            t['date'] = date_parser.parse( t['date'] )        
+            t['date'] = date_parser.parse(t['date'])
+            if t['datetime'] is not None:
+                t['datetime'] = date_parser.parse(t['datetime']) 
+            t['authorized_date'] = date_parser.parse(t['authorized_date'])
+            t['authorized_datetime'] = date_parser.parse(t['authorized_datetime'])
 
             ret.append(t)
 
