@@ -145,8 +145,10 @@ class SQLiteStorage():
             act_id   = t['account_id']
             # Can't json serialize date object
             t['date'] = t['date'].isoformat()
-            t['authorized_date'] = t['authorized_date'].isoformat()
-            t['authorized_datetime'] = t['authorized_datetime'].isoformat()
+            if t['authorized_date'] is not None:
+                t['authorized_date'] = t['authorized_date'].isoformat()
+            if t['authorized_datetime'] is not None:
+                t['authorized_datetime'] = t['authorized_datetime'].isoformat()
             if t['datetime'] is not None:
                 t['datetime'] = t['datetime'].isoformat()
             metadata = t.get('plaid2text', None)
@@ -202,9 +204,11 @@ class SQLiteStorage():
 
             t['date'] = date_parser.parse(t['date'])
             if t['datetime'] is not None:
-                t['datetime'] = date_parser.parse(t['datetime']) 
-            t['authorized_date'] = date_parser.parse(t['authorized_date'])
-            t['authorized_datetime'] = date_parser.parse(t['authorized_datetime'])
+                t['datetime'] = date_parser.parse(t['datetime'])
+            if t['authorized_date'] is not None:
+                t['authorized_date'] = date_parser.parse(t['authorized_date'])
+            if t['authorized_datetime'] is not None:
+                t['authorized_datetime'] = date_parser.parse(t['authorized_datetime'])
 
             ret.append(t)
 
